@@ -91,6 +91,8 @@ export default class Main {
     let prevRooms = this.threadRoomCache.get(thread) || [];
     let nextRooms = thread.rooms?.slice?.() || [];
     this.threadRoomCache.set(thread, nextRooms);
+    let addedRooms = nextRooms.filter(room => !prevRooms.includes(room));
+    for (let roomId of addedRooms) this.sendThreadSnapshot(thread, roomId);
     if (!update?.length || origin === 'room-sync') return;
     let targets = new Set([...prevRooms, ...nextRooms]);
     this.broadcastThreadUpdate(thread, update, targets);
@@ -104,6 +106,17 @@ export default class Main {
       let [roomId] = parseRoomKey(rid);
       if (!roomId || !rooms.has(roomId)) continue;
       tryroom.sendThreadUpdate(payload);
+    }
+  }
+  sendThreadSnapshot(thread, roomId, peer) {
+    if (!thread || !roomId) return;
+    let update = encodeBinary(thread.encodeStateAsUpdate());
+    if (!update?.length) return;
+    for (let [rid, tryroom] of Object.entries(this.state.tmp.tryrooms || {})) {
+      if (!tryroom?.sendThreadUpdate) continue;
+      let [ridRoom] = parseRoomKey(rid);
+      if (ridRoom !== roomId) continue;
+      tryroom.sendThreadUpdate({ threadId: thread.id, update }, peer);
     }
   }
   rememberDisplayName(id, name) {
@@ -258,11 +271,13 @@ export default class Main {
       tryroom.peerMetadata[peer] = { id: peer };
       await post('main.sendMetadata', rid, peer);
       await post('main.sendThreadVectors', rid, peer);
+      await post('main.sendThreadSnapshots', rid, peer);
     },
     peerLeave: (rid, peer) => { delete this.state.tmp.tryrooms[rid].peerMetadata[peer] },
     announceRoomState: async rid => {
       await post('main.sendMetadata', rid);
       await post('main.sendThreadVectors', rid);
+      await post('main.sendThreadSnapshots', rid);
     },
     sendMetadata: (rid, peer) => {
       let tryroom = this.state.tmp.tryrooms[rid];
@@ -286,6 +301,15 @@ export default class Main {
         await thread.whenReady;
         let vector = encodeBinary(thread.encodeStateVector());
         tryroom.sendThreadVector({ threadId: thread.id, vector });
+      }
+    },
+    sendThreadSnapshots: async (rid, peer) => {
+      let [roomId] = parseRoomKey(rid);
+      if (!roomId) return;
+      for (let thread of this.state.threads) {
+        if (!thread.rooms?.includes?.(roomId)) continue;
+        await thread.whenReady;
+        this.sendThreadSnapshot(thread, roomId, peer);
       }
     },
     recvThreadVector: async (rid, peer, payload = {}) => {
