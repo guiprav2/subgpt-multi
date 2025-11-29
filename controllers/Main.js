@@ -1,5 +1,13 @@
 import complete, { listModels } from '../other/complete.js';
+import { joinRoom } from 'https://esm.sh/trystero/torrent';
 import { marked } from 'https://esm.sh/marked';
+
+globalThis.hueify = x => {
+  let hash = 0;
+  for (let i = 0; i < x.length; i++) hash = (hash * 31 + x.charCodeAt(i)) | 0;
+  if (hash < 0) hash = ~hash + 1;
+  return ["slate", "gray", "zinc", "neutral", "stone", "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose"][hash % hues.length];
+};
 
 globalThis.markdown = x => marked.parse(x);
 function debounce(fn, wait = 200) { let t; return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait) } }
@@ -21,6 +29,7 @@ export default class Main {
       return ret;
     },
     get displayedLogs() { return this.thread?.logs || [] },
+    vectors: rid => [...Object.values(this.state.tmp.tryrooms?.[rid]?.peerVectors || {})],
   }
   actions = {
     init: async () => {
@@ -118,14 +127,47 @@ export default class Main {
     newRoom: async () => {
       let [btn, name] = await showModal('PromptDialog', { title: `Create Room`, placeholder: `Room name`, allowEmpty: false });
       if (btn !== 'ok') return;
-      this.state.options.rooms ??= [];
-      this.state.options.rooms.push({ id: crypto.randomUUID(), name });
-      await post('main.persist');
+      await post('main.joinTryRoom', JSON.stringify([crypto.randomUUID(), name]));
+    },
+    joinRoom: async () => {
+      let [btn, x] = await showModal('PromptDialog', { title: `Join Room`, placeholder: `Room ID`, allowEmpty: false });
+      if (btn !== 'ok') return;
+      await post('main.joinTryRoom', x);
+    },
+    copyRoomId: async (ev, x) => {
+      ev?.stopPropagation?.();
+      await navigator.clipboard.writeText(JSON.stringify([x.id, x.name]));
     },
     toggleRoom: async x => {
-      x.active = !x.active;
+      this.state.tmp.tryrooms ??= {};
+      let tryroom = this.state.tmp.tryrooms[x.id];
+      await post(!tryroom ? 'main.joinTryRoom' : 'main.leaveTryRoom', JSON.stringify([x.id, x.name]));
       await post('main.persist');
     },
+    joinTryRoom: async x => {
+      let [rid, name] = JSON.parse(x);
+      this.state.options.rooms ??= [];
+      if (!this.state.options.rooms.some(y => y.id === rid)) { this.state.options.rooms.push({ id: rid, name }); await post('main.persist') }
+      this.state.tmp.tryrooms ??= {};
+      let tryroom = this.state.tmp.tryrooms[x] = joinRoom({ appId: 'subgpt' }, x);
+      tryroom.peerVectors = {};
+      tryroom.onPeerJoin(async peer => await post('main.peerJoin', x, peer));
+      tryroom.onPeerLeave(async peer => await post('main.peerLeave', x, peer));
+      let [sendVector, getVector] = tryroom.makeAction('vector');
+      tryroom.sendVector = sendVector;
+      getVector(async (vec, peer) => await post('main.recvVector', x, peer, vec));
+    },
+    leaveTryRoom: x => {
+      this.state.tmp.tryrooms[x.id].leave();
+      delete this.state.tmp.tryrooms[x.id];
+    },
+    peerJoin: async (rid, peer) => { this.state.tmp.tryrooms[rid].peerVectors[peer] = { id: peer }, await post('main.sendVector', rid, peer) },
+    peerLeave: (rid, peer) => { delete this.state.tmp.tryrooms[rid].peerVectors[peer] },
+    sendVector: (rid, peer) => {
+      let tryroom = this.state.tmp.tryrooms[rid];
+      tryroom.sendVector({ id: this.state.options.id, displayName: this.state.options.displayName });
+    },
+    recvVector: (rid, peer, vec) => this.state.tmp.tryrooms[rid].peerVectors[peer] = { id: null, ...vec, id: peer },
     rmRoom: async (ev, x) => {
       ev?.stopPropagation?.();
       // FIXME: Disconnect
