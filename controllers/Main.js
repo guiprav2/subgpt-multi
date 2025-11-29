@@ -387,9 +387,9 @@ export default class Main {
       let msg = ev.target.value.trim();
       ev.target.value = '';
       if (msg.trim() === '/play') return showModal('GameModeDialog');
-      thread?.addLog({ id: crypto.randomUUID(), author: this.state.options.id, model: this.state.model.split(':')?.[1] || null, role: 'user', content: msg });
+      thread?.addLog({ id: crypto.randomUUID(), author: this.state.options.id, model: this.state.model.split(':')?.[1] || null, role: 'user', content: msg.trim().replace(/^\/(w|whisper) /, '') });
       d.update();
-      await post('main.complete');
+      !/^\/(w|whisper) /.test(msg.trim()) && await post('main.complete');
     },
     toggleShowModels: () => this.state.tmp.showModels = !this.state.tmp.showModels,
     changeModel: async x => { this.state.options.model = x; this.state.tmp.showModels = false; await post('main.persist') },
