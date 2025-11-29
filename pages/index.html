@@ -384,7 +384,10 @@
             <div class="nf text-6xl text-gray-300 nf-fa-users"></div>
             <div class="text-gray-400">Create or join a new room!</div>
           </div>
-          <div class="" wf-map="room of state.main.options.rooms">
+          <div
+            class="group flex flex-col gap-1"
+            wf-map="room of state.main.options.rooms"
+          >
             <button
               class="rounded-lg border border-[#dfe2e5] bg-white shadow px-3 py-2 flex items-center justify-between group text-sm hover:bg-gray-900 hover:text-white outline-none w-full lightweight"
               wf-onclick="post('main.toggleRoom', room)"
@@ -393,12 +396,18 @@
               <div class="flex items-center gap-1.5">
                 <div
                   class="nf nf-fa-chevron_right relative top-px"
-                  wf-if="room.active"
+                  wf-if="state.main.tmp.tryrooms?.[JSON.stringify([room.id, room.name])]"
                 ></div>
-                <div class="text-left">{{room.name || '...'}}</div>
+                <div class="text-left truncate max-w-52">
+                  {{room.name || '...'}} {{state.main.vectors(room.id).length ? `(${state.main.vectors(room.id).length})` : ''}}
+                </div>
               </div>
               <div>
                 <div class="flex gap-1.5 items-center">
+                  <div
+                    class="nf hidden group-hover:block text-gray-300 flex justify-center items-center relative top-[1px] hover:text-gray-100 nf-md-key_link"
+                    wf-onclick="post('main.copyRoomId', event, room)"
+                  ></div>
                   <div
                     class="nf hidden group-hover:block text-gray-300 nf-oct-x flex justify-center items-center relative top-[1px] hover:text-gray-100"
                     wf-onclick="post('main.rmRoom', event, room)"
@@ -406,6 +415,14 @@
                 </div>
               </div>
             </button>
+            <div
+              wf-map="vec of state.main.vectors(room.id)"
+              class="px-3 py-1 hidden group-hover:flex gap-3 items-center truncate text-sm"
+              wf-class="{{`text-${hueify(vec.id)}-500`}}"
+            >
+              <div class="nf nf-fa-user"></div>
+              <div>{{vec.displayName || vec.id}}</div>
+            </div>
           </div>
         </div>
 
@@ -416,6 +433,13 @@
           value=""
         >
           Create Room</button
+        ><button
+          class="rounded-lg border border-[#dfe2e5] bg-white shadow px-3 py-2 group text-center hover:text-white hover:bg-gray-900 outline-none"
+          wf-onclick="post('main.joinRoom')"
+          value=""
+          wf-if="(state.main.options.oaiKey || state.main.options.xaiKey) &amp;&amp; state.main.tmp.panel === 'rooms'"
+        >
+          Join Room</button
         ><button
           class="rounded-lg border border-[#dfe2e5] bg-white shadow px-3 py-2 group text-center hover:text-white hover:bg-gray-900 outline-none"
           wf-onclick="post('main.newThread')"
