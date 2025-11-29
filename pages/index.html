@@ -36,8 +36,8 @@
         <div class="flex items-center gap-2 pl-3">
           <div
             class="nf nf-md-chat_processing_outline text-lg"
-            wf-class="{{replaces nf-md-chat_processing_outline: { threads: 'nf-md-chat_processing_outline', rooms: 'nf-fa-users', settings: 'nf-md-cog' }[state.main.tmp.panel]}}"
             wf-if="state.main.tmp.panel"
+            wf-class="{{replaces nf-md-chat_processing_outline: { threads: 'nf-md-chat_processing_outline', rooms: 'nf-fa-users', settings: 'nf-md-cog' }[state.main.tmp.panel]}}"
           ></div>
           <div class="truncate" wf-if="state.main.tmp.panel">
             {{state.main.tmp.panel[0].toUpperCase() + state.main.tmp.panel.slice(1)}}
@@ -712,9 +712,16 @@
                   >
                     <div class="flex-1 flex flex-col overflow-auto">
                       <div
+                        wf-if="log.model"
+                        class="whitespace-normal text-xs mb-2"
+                        wf-class="{{`text-${hueify(log.model)}-500`}}"
+                      >
+                        {{log.model}}
+                      </div>
+                      <div
                         wf-if="state.main.tmp.threads?.get?.(state.main.thread)?.editing !== log"
-                        wf-innerhtml="markdown(log.content)"
                         class="flex flex-col gap-3"
+                        wf-innerhtml="markdown(log.content)"
                       >
                         Log content...
                       </div>

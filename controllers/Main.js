@@ -387,7 +387,7 @@ export default class Main {
       let msg = ev.target.value.trim();
       ev.target.value = '';
       if (msg.trim() === '/play') return showModal('GameModeDialog');
-      thread?.addLog({ id: crypto.randomUUID(), author: this.state.options.id, role: 'user', content: msg });
+      thread?.addLog({ id: crypto.randomUUID(), author: this.state.options.id, model: this.state.model.split(':')?.[1] || null, role: 'user', content: msg });
       d.update();
       await post('main.complete');
     },
@@ -412,7 +412,7 @@ export default class Main {
         let apiKey = this.state.model.startsWith('oai:') ? this.state.options.oaiKey : this.state.options.xaiKey;
         let res = await complete(logs, { simple: true, model: this.state.model, apiKey });
         if (!res.role) { console.error('Bad response:', res); console.info('Sent logs:', logs); return }
-        thread.addLog({ id: null, ...res, id: crypto.randomUUID() });
+        thread.addLog({ id: null, model: this.state.model.split(':')?.[1] || null, ...res, id: crypto.randomUUID() });
         if (thread.logs.length <= 2) {
           threadtmp.busy = false;
           !thread.name && await post('main.suggestThreadName');
