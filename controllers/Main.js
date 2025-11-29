@@ -1,6 +1,28 @@
 import complete, { listModels } from '../other/complete.js';
 import { joinRoom } from 'https://esm.sh/trystero/torrent';
 import { marked } from 'https://esm.sh/marked';
+import { ThreadDoc, THREAD_KEYS_KEY } from '../other/threadStore.js';
+
+let encodeBinary = bytes => {
+  if (!bytes?.length) return '';
+  let chunk = 0x8000;
+  let str = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    str += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(str);
+};
+let decodeBinary = str => {
+  if (!str) return new Uint8Array();
+  let bin = atob(str);
+  let out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
+let parseRoomKey = rid => {
+  try { return JSON.parse(rid) }
+  catch { return []; }
+};
 
 globalThis.hueify = x => {
   let hash = 0;
@@ -14,6 +36,8 @@ globalThis.markdown = x => marked.parse(x);
 function debounce(fn, wait = 200) { let t; return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait) } }
 
 export default class Main {
+  threadSubs = new WeakMap();
+  threadRoomCache = new WeakMap();
   state = {
     options: {},
     models: [],
@@ -30,12 +54,61 @@ export default class Main {
       return ret;
     },
     get displayedLogs() { return this.thread?.logs || [] },
-    vectors: rid => [...Object.values(this.state.tmp.tryrooms?.[rid]?.peerVectors || {})],
+    vectors: rid => [...Object.values(this.state.tmp.tryrooms?.[rid]?.peerMetadata || {})],
+  }
+  attachThread(thread) {
+    if (!thread || this.threadSubs.has(thread)) return thread;
+    let offChange = thread.onChange(() => d.update());
+    let offUpdate = thread.onDocUpdate((update, origin) => this.handleThreadDocUpdate(thread, update, origin));
+    this.threadSubs.set(thread, () => {
+      offChange?.();
+      offUpdate?.();
+    });
+    return thread;
+  }
+  detachThread(thread) {
+    if (!thread) return;
+    let off = this.threadSubs.get(thread);
+    off?.();
+    this.threadSubs.delete(thread);
+  }
+  makeThread(id) {
+    return this.attachThread(new ThreadDoc(id));
+  }
+  getThreadById(id, createIfMissing = true) {
+    if (!id) return null;
+    let thread = this.state.threads.find(x => x.id === id);
+    if (!thread && createIfMissing) {
+      thread = this.makeThread(id);
+      this.state.threads.push(thread);
+    }
+    return thread;
+  }
+  handleThreadDocUpdate(thread, update, origin) {
+    let prevRooms = this.threadRoomCache.get(thread) || [];
+    let nextRooms = thread.rooms?.slice?.() || [];
+    this.threadRoomCache.set(thread, nextRooms);
+    if (!update?.length || origin === 'room-sync') return;
+    let targets = new Set([...prevRooms, ...nextRooms]);
+    this.broadcastThreadUpdate(thread, update, targets);
+  }
+  broadcastThreadUpdate(thread, update, targetRooms) {
+    let rooms = targetRooms instanceof Set ? targetRooms : new Set(thread?.rooms || []);
+    if (!rooms.size || !update?.length) return;
+    let payload = { threadId: thread.id, update: encodeBinary(update) };
+    for (let [rid, tryroom] of Object.entries(this.state.tmp.tryrooms || {})) {
+      if (!tryroom?.sendThreadUpdate) continue;
+      let [roomId] = parseRoomKey(rid);
+      if (!roomId || !rooms.has(roomId)) continue;
+      tryroom.sendThreadUpdate(payload);
+    }
   }
   actions = {
     init: async () => {
       this.state.options = JSON.parse(localStorage.getItem('subgpt:options') || 'null') || { id: crypto.randomUUID(), model: null, filter: [], autotag: true };
-      this.state.threads = JSON.parse(localStorage.getItem('subgpt:threads') || '[]');
+      let ids = JSON.parse(localStorage.getItem(THREAD_KEYS_KEY) || '[]');
+      this.state.threads = ids.map(id => this.makeThread(id));
+      await Promise.all(this.state.threads.map(x => x.whenReady));
       await post('main.persist');
       this.state.tmp.panel = this.state.options.oaiKey || this.state.options.xaiKey ? 'threads' : 'settings';
       await post('main.listModels');
@@ -47,7 +120,7 @@ export default class Main {
       try { this.state.models = await listModels({ oaiKey: this.state.options.oaiKey, xaiKey: this.state.options.xaiKey }) }
       finally { this.state.tmp.loadingModels = false }
     },
-    newThread: () => this.state.thread = { id: crypto.randomUUID() },
+    newThread: () => this.state.thread = this.makeThread(),
     openThread: x => this.state.thread = x,
     scroll: debounce(x => {
       let p = x.parentElement;
@@ -56,11 +129,13 @@ export default class Main {
     }, 200),
     cloneThread: async () => {
       let { thread } = this.state;
+      if (!thread) return;
       let [btn, name] = await showModal('PromptDialog', { title: `Clone Thread`, placeholder: `New thread name`, value: thread.name, allowEmpty: false });
       if (btn !== 'ok') return;
-      thread = { name: null, ...thread, name };
-      this.state.threads.unshift(thread);
-      this.state.thread = thread;
+      let clone = await ThreadDoc.fromSnapshot({ ...thread.snapshot(), name });
+      this.attachThread(clone);
+      this.state.threads.unshift(clone);
+      this.state.thread = clone;
       await post('main.persist');
     },
     toggleShowFilter: () => this.state.tmp.showFilter = !this.state.tmp.showFilter,
@@ -115,14 +190,12 @@ export default class Main {
     },
     addTag: async x => {
       let { thread } = this.state;
-      thread.tags ??= [];
-      thread.tags.push(x);
+      thread?.addTag(x);
       await post('main.persist');
     },
     rmTag: async x => {
       let { thread } = this.state;
-      let i = thread.tags.indexOf(x);
-      i >= 0 && thread.tags.splice(i, 1);
+      thread?.removeTag(x);
       await post('main.persist');
     },
     newRoom: async () => {
@@ -151,30 +224,85 @@ export default class Main {
       if (!this.state.options.rooms.some(y => y.id === rid)) { this.state.options.rooms.push({ id: rid, name }); await post('main.persist') }
       this.state.tmp.tryrooms ??= {};
       let tryroom = this.state.tmp.tryrooms[x] = joinRoom({ appId: 'subgpt' }, x);
-      tryroom.peerVectors = {};
+      tryroom.peerMetadata = {};
       tryroom.onPeerJoin(async peer => await post('main.peerJoin', x, peer));
       tryroom.onPeerLeave(async peer => await post('main.peerLeave', x, peer));
-      let [sendVector, getVector] = tryroom.makeAction('vector');
-      tryroom.sendVector = sendVector;
-      getVector(async (vec, peer) => await post('main.recvVector', x, peer, vec));
+      let [sendMetadata, getMetadata] = tryroom.makeAction('metadata');
+      tryroom.sendMetadata = sendMetadata;
+      getMetadata(async (meta, peer) => await post('main.recvMetadata', x, peer, meta));
+      let [sendThreadVector, getThreadVector] = tryroom.makeAction('tvec');
+      tryroom.sendThreadVector = sendThreadVector;
+      getThreadVector(async (payload, peer) => await post('main.recvThreadVector', x, peer, payload));
+      let [sendThreadUpdate, getThreadUpdate] = tryroom.makeAction('tup');
+      tryroom.sendThreadUpdate = sendThreadUpdate;
+      getThreadUpdate(async (payload, peer) => await post('main.recvThreadUpdate', x, peer, payload));
+      await post('main.announceRoomState', x);
     },
     leaveTryRoom: x => {
       this.state.tmp.tryrooms[x].leave();
       delete this.state.tmp.tryrooms[x];
     },
-    peerJoin: async (rid, peer) => { this.state.tmp.tryrooms[rid].peerVectors[peer] = { id: peer }, await post('main.sendVector', rid, peer) },
-    peerLeave: (rid, peer) => { delete this.state.tmp.tryrooms[rid].peerVectors[peer] },
-    sendVector: (rid, peer) => {
+    peerJoin: async (rid, peer) => {
       let tryroom = this.state.tmp.tryrooms[rid];
-      tryroom.sendVector({ id: this.state.options.id, displayName: this.state.options.displayName });
+      tryroom.peerMetadata[peer] = { id: peer };
+      await post('main.sendMetadata', rid, peer);
+      await post('main.sendThreadVectors', rid, peer);
     },
-    recvVector: (rid, peer, vec) => this.state.tmp.tryrooms[rid].peerVectors[peer] = { id: null, ...vec, id: peer },
+    peerLeave: (rid, peer) => { delete this.state.tmp.tryrooms[rid].peerMetadata[peer] },
+    announceRoomState: async rid => {
+      await post('main.sendMetadata', rid);
+      await post('main.sendThreadVectors', rid);
+    },
+    sendMetadata: (rid, peer) => {
+      let tryroom = this.state.tmp.tryrooms[rid];
+      tryroom?.sendMetadata?.({ id: this.state.options.id, displayName: this.state.options.displayName }, peer);
+    },
+    recvMetadata: (rid, peer, meta) => {
+      let tryroom = this.state.tmp.tryrooms[rid];
+      if (!tryroom) return;
+      tryroom.peerMetadata[peer] = { id: peer, ...meta };
+    },
+    sendThreadVectors: async (rid, peer) => {
+      let tryroom = this.state.tmp.tryrooms[rid];
+      if (!tryroom?.sendThreadVector) return;
+      let [roomId] = parseRoomKey(rid);
+      if (!roomId) return;
+      for (let thread of this.state.threads) {
+        if (!thread.rooms?.includes?.(roomId)) continue;
+        await thread.whenReady;
+        let vector = encodeBinary(thread.encodeStateVector());
+        tryroom.sendThreadVector({ threadId: thread.id, vector });
+      }
+    },
+    recvThreadVector: async (rid, peer, payload = {}) => {
+      let { threadId, vector } = payload;
+      if (!threadId || !vector) return;
+      let thread = this.getThreadById(threadId);
+      await thread.whenReady;
+      let update = thread.encodeStateAsUpdate(decodeBinary(vector));
+      if (!update?.length) return;
+      let tryroom = this.state.tmp.tryrooms[rid];
+      tryroom?.sendThreadUpdate?.({ threadId, update: encodeBinary(update) });
+    },
+    recvThreadUpdate: async (rid, peer, payload = {}) => {
+      let { threadId, update } = payload;
+      if (!threadId || !update) return;
+      let thread = this.getThreadById(threadId);
+      await thread.whenReady;
+      let hadContent = thread.logs.length > 0;
+      thread.applyUpdate(decodeBinary(update), 'room-sync');
+      let tryroom = this.state.tmp.tryrooms[rid];
+      if (!hadContent && tryroom?.sendThreadVector) {
+        let vector = encodeBinary(thread.encodeStateVector());
+        tryroom.sendThreadVector({ threadId, vector });
+      }
+      await post('main.persist');
+    },
     rmRoom: async (ev, x) => {
       ev?.stopPropagation?.();
       // FIXME: Disconnect
       for (let y of this.state.threads) {
-        let i = y.rooms?.indexOf?.(x.id) ?? -1;
-        i >= 0 && y.rooms.splice(i, 1);
+        y.removeRoom(x.id);
       }
       let i = this.state.options.rooms.indexOf(x);
       i >= 0 && this.state.options.rooms.splice(i, 1);
@@ -184,7 +312,7 @@ export default class Main {
       ev?.stopPropagation?.();
       let [btn, ...rooms] = await showModal('ShareThreadDialog', { thread: x });
       if (btn !== 'ok') return;
-      x.rooms = rooms;
+      x.setRooms(rooms);
       await post('main.persist');
     },
     toggleArchives: (ev, x) => {
@@ -219,8 +347,7 @@ export default class Main {
       let msg = ev.target.value.trim();
       ev.target.value = '';
       if (msg.trim() === '/play') return showModal('GameModeDialog');
-      thread.logs ??= [];
-      thread.logs.push({ id: crypto.randomUUID(), role: 'user', content: msg });
+      thread?.addLog({ id: crypto.randomUUID(), role: 'user', content: msg });
       d.update();
       await post('main.complete');
     },
@@ -243,7 +370,7 @@ export default class Main {
         let apiKey = this.state.model.startsWith('oai:') ? this.state.options.oaiKey : this.state.options.xaiKey;
         let res = await complete(logs, { simple: true, model: this.state.model, apiKey });
         if (!res.role) { console.error('Bad response:', res); console.info('Sent logs:', logs); return }
-        thread.logs.push({ id: null, ...res, id: crypto.randomUUID() });
+        thread.addLog({ id: null, ...res, id: crypto.randomUUID() });
         if (thread.logs.length <= 2) {
           threadtmp.busy = false;
           !thread.name && await post('main.suggestThreadName');
@@ -301,8 +428,7 @@ export default class Main {
         );
         console.log('addRes:', addRes.content);
         if (!addRes.content.includes('[NONE]')) {
-          thread.tags ??= [];
-          for (let x of addRes.content.split(',').map(x => x.trim().toLowerCase().replace(/^pull:/, '').replaceAll(/[ _]+/g, '-'))) !thread.tags.includes(x) && thread.tags.push(x);
+          for (let x of addRes.content.split(',').map(x => x.trim().toLowerCase().replace(/^pull:/, '').replaceAll(/[ _]+/g, '-'))) thread.addTag(x);
         }
         d.update();
         /* FIXME:
@@ -321,8 +447,7 @@ export default class Main {
         console.log('rmRes:', rmRes.content);
         if (!rmRes.content.includes('[NONE]')) {
           for (let x of rmRes.content.split(',').map(x => x.trim().toLowerCase().replaceAll(/[ _]+/g, '-'))) {
-            let i = thread.tags.indexOf(x);
-            i >= 0 && thread.tags.splice(i, 1);
+            thread.removeTag(x);
           }
         }
         */
@@ -332,8 +457,7 @@ export default class Main {
       }
     },
     toggleGameModeLog: async x => {
-      if (!x.gameMode) x.gameMode = true;
-      else delete x.gameMode;
+      x.gameMode = x.gameMode ? null : true;
       await post('main.persist');
     },
     editLog: x => {
@@ -361,14 +485,13 @@ export default class Main {
     },
     rmLog: async x => {
       let { thread } = this.state;
-      let i = thread.logs.indexOf(x);
-      i >= 0 && thread.logs.splice(i, 1);
+      thread?.removeLog(x);
       await post('main.persist');
     },
     toggleArchived: async (ev, x) => {
       ev?.stopPropagation?.();
       x.archived = !x.archived;
-      if (x.archived) delete x.rooms;
+      if (x.archived) x.setRooms([]);
       if (x.archived && this.state.thread === x) this.state.thread = null;
       if (!this.state.threads.some(x => x.archived)) this.state.tmp.panel = 'threads';
       await post('main.persist');
@@ -376,13 +499,18 @@ export default class Main {
     rm: async (ev, x) => {
       ev?.stopPropagation?.();
       let i = this.state.threads.indexOf(x);
-      i >= 0 && this.state.threads.splice(i, 1);
+      if (i >= 0) {
+        this.state.threads.splice(i, 1);
+        this.detachThread(x);
+        await x.deleteFromStorage();
+      }
       if (this.state.thread === x) this.state.thread = null;
       await post('main.persist');
     },
     persist: () => {
       localStorage.setItem('subgpt:options', JSON.stringify(this.state.options));
-      localStorage.setItem('subgpt:threads', JSON.stringify(this.state.threads));
+      localStorage.setItem(THREAD_KEYS_KEY, JSON.stringify(this.state.threads.map(x => x.id)));
+      localStorage.removeItem('subgpt:threads');
     },
   };
 }
