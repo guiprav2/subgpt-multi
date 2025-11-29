@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Dialogs.html</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1"
+    />
+    <script>
+      window.rootPrefix = /^\/(files|preview)\//.test(location.pathname)
+        ? location.pathname.split('/').slice(0, 4).join('/')
+        : '/';
+    </script>
+    <script type="module" src="../webfoundry/ifdesigner.js"></script>
+    <script src="../webfoundry/head.js"></script>
+  </head>
+  <body
+    class="flex flex-col [&amp;&gt;div:first-child]:flex-1 min-h-screen"
+    style="display: none"
+  >
+    <div class="p-16 flex flex-col gap-12">
+      <div class="grid grid-cols-3">
+        <div class="flex flex-col gap-6">
+          <div class="text-4xl">PromptDialog</div>
+          <form
+            id="PromptDialog"
+            class="w-84 rounded-xl bg-white/80 shadow flex flex-col gap-2 border border-slate-200 text-neutral-950 p-4 backdrop-blur-md"
+            method="dialog"
+            wf-onsubmit="this.submit(event)"
+          >
+            <div wf-if="this.props.title?.trim?.()">
+              {{this.props.title.trim()}}
+            </div>
+            <input
+              class="px-3 border rounded-lg outline-none border-slate-300 py-0.5"
+              wf-placeholder="this.props.placeholder || '...'"
+              placeholder="..."
+              wf-value="this.props.value"
+              value=""
+              wf-onkeydown="this.keyDown(event)"
+              wf-class="{{replaces border-slate-300: !this.dirty || this.valid ? 'border-slate-300' : 'border-red-300'}}"
+              wf-onattach="_1.select()"
+            />
+            <div wf-if="this.error" class="text-sm text-yellow-600">
+              {{this.error}}
+            </div>
+            <div class="flex gap-2">
+              <button
+                value="cancel"
+                class="px-3 flex-1 bg-slate-200 rounded-md hover:bg-slate-300 py-1"
+              >
+                Cancel</button
+              ><button
+                value="ok"
+                class="px-3 flex-1 rounded-md text-white hover:bg-slate-900 bg-slate-800 py-1"
+              >
+                OK
+              </button>
+            </div>
+          </form>
+        </div>
+        <div class="flex flex-col gap-6">
+          <div class="text-4xl">ShareThreadDialog</div>
+          <form
+            id="ShareThreadDialog"
+            class="w-84 rounded-xl bg-white/80 shadow flex flex-col gap-2 border border-slate-200 text-neutral-950 p-4 backdrop-blur-md"
+            method="dialog"
+            wf-onsubmit="this.submit(event)"
+          >
+            <div wf-if="this.props.title?.trim?.()">Share Thread by Room</div>
+            <div class="" wf-map="room of state.main.options.rooms">
+              <button
+                class="rounded-lg border border-[#dfe2e5] bg-white shadow px-3 py-2 flex items-center justify-between group text-sm hover:bg-gray-900 hover:text-white outline-none w-full lightweight"
+                wf-onclick="this.toggle(room.id)"
+                value=""
+                type="button"
+              >
+                <div class="flex items-center gap-1.5">
+                  <div
+                    class="nf nf-fa-chevron_right relative top-px"
+                    wf-if="this.rooms.includes(room.id)"
+                  ></div>
+                  <div class="text-left">{{room.name || '...'}}</div>
+                </div>
+              </button>
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                value="cancel"
+                class="px-3 flex-1 bg-slate-200 rounded-md hover:bg-slate-300 py-1"
+              >
+                Cancel</button
+              ><button
+                value="ok"
+                class="px-3 flex-1 rounded-md text-white hover:bg-slate-900 bg-slate-800 py-1"
+              >
+                Apply
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="flex flex-col gap-6">
+        <div class="text-4xl">GameModeDialog</div>
+        <div
+          id="GameModeDialog"
+          class="rounded-lg shadow-lg text-neutral-50 max-w-7xl flex flex-col gap-4 h-[80vh] w-screen bg-neutral-950 p-8"
+          wf-onattach="post('game.init')"
+        >
+          <style>
+            #GameModeDialog p {
+              display: inline;
+            }
+          </style>
+
+          <div
+            class="text-center text-7xl flex-1 flex justify-center items-center"
+            wf-if="state.game.wait"
+          >
+            <span class="nf nf-fa-star animate-ping"></span>
+          </div>
+          <div
+            class="scrollarea flex flex-col gap-4 flex-1 overflow-auto text-3xl select-none"
+            wf-onclick="post('game.next')"
+            wf-if="!state.game.wait"
+          ></div>
+          <div class="text-sm text-right">
+            {{state.game.title}} ({{`${state.game.i + 1} / ${state.game.src.length}`}})
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
