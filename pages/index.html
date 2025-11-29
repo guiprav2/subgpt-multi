@@ -627,22 +627,22 @@
               >
                 <div class="flex flex-col gap-3 lightweight sm:gap-4">
                   <div
-                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 self-end pb-3.5 gap-1 MsgBox hover:bg-gray-100 w-screen xl:max-w-3xl max-w-full relative mt-4"
+                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 self-end pb-3.5 gap-1 MsgBox hover:bg-gray-100 xl:max-w-3xl max-w-full relative mt-4 xl:w-screen min-w-lg"
                     wf-if="log.role === 'user'"
                     wf-onattach="post('main.scroll', _1, log)"
                   >
                     <div class="flex-1 flex flex-col">
                       <div
-                        class="whitespace-normal text-xs mb-2"
                         wf-if="log.author"
+                        class="whitespace-normal text-xs mb-2"
                         wf-class="{{`text-${hueify(log.author)}-500`}}"
                       >
                         {{state.main.lastDisplayNames[log.author] || `Anonymous User`}}
                       </div>
 
                       <div
-                        class="flex flex-col gap-3 overflow-auto"
                         wf-if="state.main.tmp.threads?.get?.(state.main.thread)?.editing !== log"
+                        class="flex flex-col gap-3 overflow-auto"
                         wf-innerhtml="markdown(Array.isArray(log.content) ? log.content[0].text : log.content)"
                       >
                         Log content...
@@ -698,7 +698,7 @@
                     </div>
                   </div>
                   <div
-                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 max-w-3xl pb-3.5 gap-1 MsgBox hover:bg-gray-100 relative mt-4"
+                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 pb-3.5 gap-1 MsgBox hover:bg-gray-100 relative mt-4 xl:max-w-3xl xl:w-screen self-start min-w-lg"
                     wf-if="log.role === 'assistant' &amp;&amp; log.content.trim()"
                     wf-onattach="post('main.scroll', _1, log)"
                   >
