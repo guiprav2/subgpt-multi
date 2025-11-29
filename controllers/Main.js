@@ -1,5 +1,5 @@
 import complete, { listModels } from '../other/complete.js';
-import { joinRoom } from 'https://esm.sh/trystero/torrent';
+import { joinRoom } from 'https://esm.sh/trystero/nostr';
 import { marked } from 'https://esm.sh/marked';
 import { ThreadDoc, THREAD_KEYS_KEY } from '../other/threadStore.js';
 
