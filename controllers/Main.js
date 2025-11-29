@@ -83,7 +83,9 @@ export default class Main {
     let thread = this.state.threads.find(x => x.id === id);
     if (!thread && createIfMissing) {
       thread = this.makeThread(id);
-      this.state.threads.push(thread);
+      this.threadRoomCache.set(thread, thread.rooms?.slice?.() || []);
+      this.state.threads.unshift(thread);
+      d.update();
     }
     return thread;
   }
