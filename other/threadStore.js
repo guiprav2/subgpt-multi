@@ -1,5 +1,4 @@
-import * as Y from 'https://esm.sh/yjs@13.6.1';
-import { IndexeddbPersistence } from 'https://esm.sh/y-indexeddb';
+import { Y, IndexeddbPersistence } from './y.js';
 
 export const THREAD_KEYS_KEY = 'subgpt:threadKeys';
 const THREAD_DB_PREFIX = 'subgpt:thread:';
