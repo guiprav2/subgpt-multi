@@ -30,8 +30,7 @@
         }
       </style>
       <div
-        class="flex-col gap-3 p-8 z-10 shadow-xl flex w-screen bg-neutral-100 overflow-auto xl:h-screen shrink-0 md:w-92"
-        wf-class="{{replaces flex: state.main.sidebarOpen ? 'flex' : 'hidden sm:flex'}}"
+        class="flex-col gap-3 p-8 z-10 shadow-xl flex w-screen bg-neutral-100 xl:h-screen shrink-0 md:w-92 md:overflow-auto"
       >
         <div class="flex items-center gap-2 pl-3">
           <div
@@ -279,7 +278,7 @@
         </div>
 
         <div
-          class="flex-1 flex flex-col gap-1.5 min-h-0 overflow-auto basis-0 min-h-min"
+          class="flex-1 flex flex-col gap-1.5 min-h-0 overflow-auto min-h-min shrink-0"
           wf-map="room of state.main.options.rooms?.filter?.(x =&gt; x.active &amp;&amp; state.main.tmp.roomThreads?.[x.id]?.length)"
         >
           <div
@@ -311,7 +310,7 @@
           </div>
         </div>
         <div
-          class="flex-1 flex flex-col gap-1.5 min-h-0 overflow-auto basis-0 min-h-min"
+          class="flex-1 flex flex-col gap-1.5 min-h-0 overflow-auto min-h-min shrink-0"
           wf-if="state.main.displayedThreads.length"
         >
           <div
@@ -374,7 +373,7 @@
           </div>
         </div>
         <div
-          class="flex-1 flex flex-col gap-1.5 min-h-0 overflow-auto basis-0 min-h-min"
+          class="flex-1 flex flex-col gap-1.5 min-h-0 overflow-auto min-h-min shrink-0"
           wf-if="state.main.tmp.panel === 'rooms'"
         >
           <div
@@ -449,15 +448,8 @@
         >
           New Thread
         </button>
-        <button
-          class="rounded-lg border border-[#dfe2e5] bg-white shadow px-3 py-2 group text-center hover:text-white hover:bg-gray-900 outline-none sm:hidden"
-          wf-onclick="post('main.toggleSidebar')"
-          value=""
-        >
-          Close
-        </button>
       </div>
-      <div class="flex-1 flex flex-col">
+      <div class="flex-1 flex flex-col min-h-min">
         <div
           class="border-l border-gray-300 flex justify-center items-center py-16 flex-col gap-4 flex-1"
           wf-if="!state.main.options.oaiKey &amp;&amp; !state.main.options.xaiKey"
@@ -820,7 +812,7 @@
                 </div>
               </div>
               <button
-                class="px-4 h-full text-gray-600 hover:text-gray-900 outline-none"
+                class="px-4 h-full text-gray-600 hover:text-gray-900 outline-none truncate max-w-36 md:max-w-64"
                 wf-if="!state.main.loadingModels"
                 wf-onclick="post('main.toggleShowModels')"
                 value=""
