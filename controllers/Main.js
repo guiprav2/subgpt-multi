@@ -6,7 +6,8 @@ globalThis.hueify = x => {
   let hash = 0;
   for (let i = 0; i < x.length; i++) hash = (hash * 31 + x.charCodeAt(i)) | 0;
   if (hash < 0) hash = ~hash + 1;
-  return ["slate", "gray", "zinc", "neutral", "stone", "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose"][hash % hues.length];
+  let hues = ["slate", "gray", "zinc", "neutral", "stone", "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose"];
+  return hues[hash % hues.length];
 };
 
 globalThis.markdown = x => marked.parse(x);
@@ -140,7 +141,7 @@ export default class Main {
     },
     toggleRoom: async x => {
       this.state.tmp.tryrooms ??= {};
-      let tryroom = this.state.tmp.tryrooms[x.id];
+      let tryroom = this.state.tmp.tryrooms[JSON.stringify([x.id, x.name])];
       await post(!tryroom ? 'main.joinTryRoom' : 'main.leaveTryRoom', JSON.stringify([x.id, x.name]));
       await post('main.persist');
     },
@@ -158,8 +159,8 @@ export default class Main {
       getVector(async (vec, peer) => await post('main.recvVector', x, peer, vec));
     },
     leaveTryRoom: x => {
-      this.state.tmp.tryrooms[x.id].leave();
-      delete this.state.tmp.tryrooms[x.id];
+      this.state.tmp.tryrooms[x].leave();
+      delete this.state.tmp.tryrooms[x];
     },
     peerJoin: async (rid, peer) => { this.state.tmp.tryrooms[rid].peerVectors[peer] = { id: peer }, await post('main.sendVector', rid, peer) },
     peerLeave: (rid, peer) => { delete this.state.tmp.tryrooms[rid].peerVectors[peer] },

@@ -71,14 +71,14 @@
             ><button
               class="p-1.5 outline-none rounded-full hover:text-gray-800 flex gap-1 items-center"
               wf-onclick="post('main.toggleRooms')"
-              wf-class="{{replaces hover:text-gray-800: state.main.tmp.panel !== 'rooms' ? (!state.main.options.rooms?.some?.(x =&gt; x.active) ? 'hover:text-gray-800' : 'text-green-600 hover:text-green-700') : (!state.main.options.rooms?.some?.(x =&gt; x.active) ? 'bg-gray-200 text-gray-800' : 'bg-green-200 text-green-600 hover:text-green-700')}}"
+              wf-class="{{replaces hover:text-gray-800: state.main.tmp.panel !== 'rooms' ? (!state.main.options.rooms?.some?.(x =&gt; state.main.tmp.tryrooms?.[JSON.stringify([x.id, x.name])]) ? 'hover:text-gray-800' : 'text-green-600 hover:text-green-700') : (!state.main.options.rooms?.some?.(x =&gt; state.main.tmp.tryrooms?.[JSON.stringify([x.id, x.name])]) ? 'bg-gray-200 text-gray-800' : 'bg-green-200 text-green-600 hover:text-green-700')}}"
               value=""
             >
               <div
                 class="truncate max-w-6 text-xs"
-                wf-if="state.main.options.rooms.filter(x =&gt; x.active).length"
+                wf-if="state.main.options.rooms.filter(x =&gt; state.main.tmp.tryrooms?.[JSON.stringify([x.id, x.name])]).length"
               >
-                {{state.main.options.rooms.filter(x =&gt; x.active).length}}
+                {{state.main.options.rooms.filter(x =&gt; state.main.tmp.tryrooms?.[JSON.stringify([x.id, x.name])]).length}}
               </div>
               <div class="nf nf-fa-users"></div>
             </button>
@@ -398,14 +398,27 @@
                   class="nf nf-fa-chevron_right relative top-px"
                   wf-if="state.main.tmp.tryrooms?.[JSON.stringify([room.id, room.name])]"
                 ></div>
-                <div class="text-left truncate max-w-52">
+                <div class="text-left truncate max-w-48">
                   {{room.name || '...'}} {{state.main.vectors(room.id).length ? `(${state.main.vectors(room.id).length})` : ''}}
                 </div>
               </div>
               <div>
                 <div class="flex gap-1.5 items-center">
                   <div
-                    class="nf hidden group-hover:block text-gray-300 flex justify-center items-center relative top-[1px] hover:text-gray-100 nf-md-key_link"
+                    class="text-gray-300 justify-center items-center relative top-[1px] hover:text-gray-100 hidden gap-1 group-hover:flex"
+                    wf-class="{{replaces hidden text-gray-300: !thread.rooms?.length ? 'hidden text-gray-300' : 'flex text-green-600 hover:text-green-700'}}"
+                    wf-if="state.main.options.rooms?.length"
+                  >
+                    <div
+                      class="truncate max-w-6 text-xs"
+                      wf-if="thread.rooms?.length"
+                    >
+                      {{thread.rooms?.length}}
+                    </div>
+                    <div class="nf nf-fa-users"></div>
+                  </div>
+                  <div
+                    class="nf hidden group-hover:block text-gray-300 justify-center items-center relative top-[1px] hover:text-gray-100 nf-md-key_link"
                     wf-onclick="post('main.copyRoomId', event, room)"
                   ></div>
                   <div
@@ -416,7 +429,7 @@
               </div>
             </button>
             <div
-              wf-map="vec of state.main.vectors(room.id)"
+              wf-map="vec of state.main.vectors(JSON.stringify([room.id, room.name]))"
               class="px-3 py-1 hidden group-hover:flex gap-3 items-center truncate text-sm"
               wf-class="{{`text-${hueify(vec.id)}-500`}}"
             >
