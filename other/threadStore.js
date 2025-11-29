@@ -27,6 +27,11 @@ class ThreadLog {
         set: value => { this.map.set('role', value); this.notify(); },
         enumerable: true,
       },
+      author: {
+        get: () => this.map.get('author'),
+        set: value => { this.map.set('author', cloneValue(value)); this.notify(); },
+        enumerable: true,
+      },
       content: {
         get: () => this.map.get('content'),
         set: value => { this.map.set('content', cloneValue(value)); this.notify(); },

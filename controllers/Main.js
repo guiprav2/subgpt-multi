@@ -3,6 +3,8 @@ import { joinRoom } from 'https://esm.sh/trystero/torrent';
 import { marked } from 'https://esm.sh/marked';
 import { ThreadDoc, THREAD_KEYS_KEY } from '../other/threadStore.js';
 
+const DISPLAY_NAMES_KEY = 'subgpt:displayNames';
+
 let encodeBinary = bytes => {
   if (!bytes?.length) return '';
   let chunk = 0x8000;
@@ -45,6 +47,7 @@ export default class Main {
     get tags() { return [...new Set(this.threads.flatMap(x => x.tags || []))] },
     threads: [],
     tmp: {},
+    lastDisplayNames: {},
     get displayedThreads() {
       let ret = [];
       if (this.tmp.panel === 'threads') ret = this.threads.filter(x => !x.archived);
@@ -103,12 +106,20 @@ export default class Main {
       tryroom.sendThreadUpdate(payload);
     }
   }
+  rememberDisplayName(id, name) {
+    if (!id || !name) return;
+    if (this.state.lastDisplayNames[id] === name) return;
+    this.state.lastDisplayNames = { ...this.state.lastDisplayNames, [id]: name };
+    localStorage.setItem(DISPLAY_NAMES_KEY, JSON.stringify(this.state.lastDisplayNames));
+  }
   actions = {
     init: async () => {
       this.state.options = JSON.parse(localStorage.getItem('subgpt:options') || 'null') || { id: crypto.randomUUID(), model: null, filter: [], autotag: true };
+      this.state.lastDisplayNames = JSON.parse(localStorage.getItem(DISPLAY_NAMES_KEY) || 'null') || {};
       let ids = JSON.parse(localStorage.getItem(THREAD_KEYS_KEY) || '[]');
       this.state.threads = ids.map(id => this.makeThread(id));
       await Promise.all(this.state.threads.map(x => x.whenReady));
+      this.rememberDisplayName(this.state.options.id, this.state.options.displayName);
       await post('main.persist');
       this.state.tmp.panel = this.state.options.oaiKey || this.state.options.xaiKey ? 'threads' : 'settings';
       await post('main.listModels');
@@ -227,7 +238,7 @@ export default class Main {
       tryroom.peerMetadata = {};
       tryroom.onPeerJoin(async peer => await post('main.peerJoin', x, peer));
       tryroom.onPeerLeave(async peer => await post('main.peerLeave', x, peer));
-      let [sendMetadata, getMetadata] = tryroom.makeAction('metadata');
+      let [sendMetadata, getMetadata] = tryroom.makeAction('meta');
       tryroom.sendMetadata = sendMetadata;
       getMetadata(async (meta, peer) => await post('main.recvMetadata', x, peer, meta));
       let [sendThreadVector, getThreadVector] = tryroom.makeAction('tvec');
@@ -255,12 +266,15 @@ export default class Main {
     },
     sendMetadata: (rid, peer) => {
       let tryroom = this.state.tmp.tryrooms[rid];
+      this.rememberDisplayName(this.state.options.id, this.state.options.displayName);
       tryroom?.sendMetadata?.({ id: this.state.options.id, displayName: this.state.options.displayName }, peer);
     },
     recvMetadata: (rid, peer, meta) => {
       let tryroom = this.state.tmp.tryrooms[rid];
       if (!tryroom) return;
-      tryroom.peerMetadata[peer] = { id: peer, ...meta };
+      let pid = meta?.id || peer;
+      tryroom.peerMetadata[peer] = { id: pid, ...meta };
+      meta?.displayName && this.rememberDisplayName(pid, meta.displayName);
     },
     sendThreadVectors: async (rid, peer) => {
       let tryroom = this.state.tmp.tryrooms[rid];
@@ -347,7 +361,7 @@ export default class Main {
       let msg = ev.target.value.trim();
       ev.target.value = '';
       if (msg.trim() === '/play') return showModal('GameModeDialog');
-      thread?.addLog({ id: crypto.randomUUID(), role: 'user', content: msg });
+      thread?.addLog({ id: crypto.randomUUID(), author: this.state.options.id, role: 'user', content: msg });
       d.update();
       await post('main.complete');
     },
@@ -362,7 +376,9 @@ export default class Main {
       try {
         threadtmp.busy = true;
         d.update();
-        let logs = !this.state.options.unary ? [...this.state.displayedLogs] : [{ role: 'user', content: this.state.displayedLogs.map(x => x.content).join('\n\n') }];
+        let logs = [...this.state.displayedLogs].map(x => ({ ...x, content: !x.author ? x.content : `[${this.state.lastDisplayNames[x.author]}] ${x.content}` }));
+        logs = !this.state.options.unary ? [...logs] : [{ role: 'user', content: logs.map(x => x.content).join('\n\n') }];
+        logs.unshift({ role: 'system', content: `You are a multi-user chat assistant. Logs will be prefixed with e.g. [Author Name] so you know who said what. Feel free to reply to them by name, but do not mark your responses with a similar [Bot Author] mark.` });
         for (let x of thread.tags?.filter?.(x => x.startsWith('pull:')) || []) {
           let prime = this.state.threads.filter(y => !y.archived && y.tags?.includes?.(x.slice('pull:'.length)));
           logs.unshift(...prime.flatMap(x => x.logs));
@@ -509,8 +525,10 @@ export default class Main {
     },
     persist: () => {
       localStorage.setItem('subgpt:options', JSON.stringify(this.state.options));
+      this.rememberDisplayName(this.state.options.id, this.state.options.displayName);
       localStorage.setItem(THREAD_KEYS_KEY, JSON.stringify(this.state.threads.map(x => x.id)));
       localStorage.removeItem('subgpt:threads');
+      localStorage.setItem(DISPLAY_NAMES_KEY, JSON.stringify(this.state.lastDisplayNames));
     },
   };
 }
