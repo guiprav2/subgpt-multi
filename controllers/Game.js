@@ -1,50 +1,25 @@
 export default class Game {
   state = {
-    get title() { return this.thread?.name || '' },
+    payload: null,
+    thread: null,
+    get title() { return this.thread?.name || 'Game Mode' },
     bold: 0,
     italic: 0,
-    i: 0,
-    j: 0,
-    wait: false,
-    thread: null,
-    src: [],
-    storySignature: null,
-    typewriting: false,
-    ff: false,
-    quotes: false,
   };
-  resetStory() {
-    this.state.thread = null;
-    this.state.src = [];
-    this.state.storySignature = null;
-    this.state.i = 0;
-    this.state.j = 0;
-    this.state.bold = 0;
-    this.state.italic = 0;
-    this.state.wait = false;
-    this.state.typewriting = false;
-    this.state.ff = false;
-    this.state.quotes = false;
-  }
-  finishStory() {
-    this.resetStory();
-    this.root?.parentElement?.close?.();
-  }
   actions = {
+    usePayload: thread => {
+      this.state.payload = thread;
+    },
     init: async () => {
-      let { thread } = state.main;
-      if (!thread) return this.finishStory();
-      let logs = thread.logs.some(x => x.gameMode) ? thread.logs.filter(x => x.gameMode) : thread.logs;
-      let src = logs.filter(x => x.role === 'assistant' || x.gameMode).flatMap(x => x.content.split('\n')).map(x => (x.length >= 20 || !/page|paragraph/i.test(x)) ? x : `# ${x}`).filter(x => x.trim()).map(x => x.trim());
-      let storySignature = src.join('\n');
-      if (!src.length) return this.finishStory();
-      let needsReset = this.state.thread !== thread || this.state.storySignature !== storySignature || !this.state.src?.length;
-      if (!needsReset) return;
-      this.resetStory();
+      let thread = state.main?.thread || this.state.payload;
+      if (!thread) return;
+      if (this.state.thread === thread) return;
       this.state.thread = thread;
-      this.state.src = src;
-      this.state.storySignature = storySignature;
+      let logs = Array.isArray(thread.logs) ? thread.logs : [];
+      logs = logs.some(x => x?.gameMode) ? logs.filter(x => x?.gameMode) : logs;
+      this.state.src = logs.filter(x => x.role === 'assistant' || x.gameMode).flatMap(x => x.content.split('\n')).map(x => (x.length >= 20 || !/page|paragraph/i.test(x)) ? x : `# ${x}`).filter(x => x.trim()).map(x => x.trim());
       console.log(this.state.src);
+      this.state.i = this.state.j = 0;
       this.state.wait = true;
       d.update();
       await new Promise(pres => setTimeout(pres, 3000));
@@ -54,11 +29,9 @@ export default class Game {
     },
     next: async () => {
       let scrollarea = document.querySelector('#GameModeDialog .scrollarea');
-      if (!this.state.src?.length || this.state.i >= this.state.src.length) return this.finishStory();
       if (this.state.typewriting) return this.state.ff = !!scrollarea.textContent.trim() && !this.state.wait;
       let ln = d.el('div');
       let done;
-      let reachedEnd = false;
       try {
         this.state.typewriting = true;
         scrollarea.querySelector('.next')?.remove?.();
@@ -85,7 +58,7 @@ export default class Game {
             }
             x = this.state.src[this.state.i]
             this.state.j = 0;
-            if (!x) { reachedEnd = true; break }
+            if (!x) return;
             if (clear) { ln = d.el('div'); scrollarea.append(ln); span = d.el('span', { class: 'mr-2' }); ln.append(span) }
             continue;
           }
@@ -125,9 +98,7 @@ export default class Game {
         }
       } finally {
         if (done) { console.log('adv'); this.state.i++; this.state.j = 0 }
-        if (this.state.i >= this.state.src.length) reachedEnd = true;
         this.state.typewriting = this.state.ff = false;
-        if (reachedEnd) return this.finishStory();
         ln.append(d.el('span', { class: 'next animate-pulse nf nf-fa-chevron_down' }));
       }
     },
