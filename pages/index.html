@@ -481,7 +481,7 @@
             class="absolute nf nf-md-menu flex justify-center p-3 sm:hidden rounded-full bottom-5 right-5 bg-gray-100 text-gray-600"
             wf-onclick="post('main.toggleSidebar')"
           ></div>
-          <div>
+          <div class="py-4 md:py-0">
             <div class="flex items-center group flex-wrap gap-y-1 gap-x-1.5">
               <div class="text-xl sm:text-3xl">
                 {{state.main.thread.name || '...'}}
@@ -596,7 +596,7 @@
             </div>
           </div>
           <div
-            class="flex-1 basis-0 min-h-0 overflow-auto flex flex-col gap-8 min-h-32 pb-1"
+            class="flex-1 basis-0 min-h-0 overflow-auto flex flex-col gap-8 pb-1 xl:min-h-32 min-h-72"
             id="autoscroll"
           >
             <div
@@ -627,7 +627,7 @@
               >
                 <div class="flex flex-col gap-3 lightweight sm:gap-4">
                   <div
-                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 self-end pb-3.5 gap-1 MsgBox hover:bg-gray-100 xl:max-w-3xl max-w-full relative mt-4 xl:w-screen min-w-lg"
+                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 self-end pb-3.5 gap-1 MsgBox hover:bg-gray-100 xl:max-w-3xl max-w-full relative mt-4 xl:w-screen md:min-w-lg w-full"
                     wf-if="log.role === 'user'"
                     wf-onattach="post('main.scroll', _1, log)"
                   >
@@ -698,7 +698,7 @@
                     </div>
                   </div>
                   <div
-                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 pb-3.5 gap-1 MsgBox hover:bg-gray-100 relative mt-4 xl:max-w-3xl xl:w-screen self-start min-w-lg"
+                    class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 pb-3.5 gap-1 MsgBox hover:bg-gray-100 relative mt-4 xl:max-w-3xl xl:w-screen self-start md:min-w-lg w-full"
                     wf-if="log.role === 'assistant' &amp;&amp; log.content.trim()"
                     wf-onattach="post('main.scroll', _1, log)"
                   >
@@ -812,7 +812,7 @@
                 </div>
               </div>
               <button
-                class="px-4 h-full text-gray-600 hover:text-gray-900 outline-none truncate max-w-36 md:max-w-64"
+                class="px-4 h-full text-gray-600 hover:text-gray-900 outline-none truncate md:max-w-64 max-w-30"
                 wf-if="!state.main.loadingModels"
                 wf-onclick="post('main.toggleShowModels')"
                 value=""
