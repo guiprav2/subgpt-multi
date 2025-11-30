@@ -623,7 +623,7 @@
             >
               <div
                 class=""
-                wf-map="log of state.main.displayedLogs.filter(x =&gt; !x.priming)"
+                wf-map="log of state.main.displayedLogs.filter(x =&gt; x.role !== 'system')"
               >
                 <div class="flex flex-col gap-3 lightweight sm:gap-4">
                   <div
@@ -696,6 +696,20 @@
                         value=""
                       ></button>
                     </div>
+                  </div>
+                  <div
+                    wf-if="log.role === 'reasoning'"
+                    class="text-sm text-center text-gray-500"
+                    wf-onattach="post('main.scroll', _1, log)"
+                  >
+                    {{log.content}}
+                  </div>
+                  <div
+                    class="text-sm text-center text-red-700"
+                    wf-if="log.role === 'error'"
+                    wf-onattach="post('main.scroll', _1, log)"
+                  >
+                    {{log.content}}
                   </div>
                   <div
                     class="rounded-lg border border-[#dfe2e5] bg-white shadow flex justify-between group whitespace-pre-wrap p-4 pb-3.5 gap-1 MsgBox hover:bg-gray-100 relative mt-4 xl:max-w-3xl xl:w-screen self-start md:min-w-lg w-full"
