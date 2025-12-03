@@ -178,7 +178,7 @@
                 placeholder="sk-shhh..."
                 wf-value="state.main.options.oaiKey"
                 wf-onkeyup="post('main.persist')"
-                wf-onblur="post('main.listModels')"
+                wf-onblur="post('main.persist'), post('main.listModels')"
               />
             </div>
             <div class="flex items-center justify-between mb-4">
@@ -193,7 +193,7 @@
                 placeholder="xai-shhh..."
                 wf-value="state.main.options.xaiKey"
                 wf-onkeyup="post('main.persist')"
-                wf-onblur="post('main.listModels')"
+                wf-onblur="post('main.persist'), post('main.listModels')"
               />
             </div>
             <div wf-if="state.main.options.oaiKey || state.main.options.xaiKey">
