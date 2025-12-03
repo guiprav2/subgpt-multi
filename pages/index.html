@@ -178,6 +178,7 @@
                 placeholder="sk-shhh..."
                 wf-value="state.main.options.oaiKey"
                 wf-onkeyup="post('main.persist')"
+                wf-onblur="post('main.listModels')"
               />
             </div>
             <div class="flex items-center justify-between mb-4">
@@ -192,6 +193,7 @@
                 placeholder="xai-shhh..."
                 wf-value="state.main.options.xaiKey"
                 wf-onkeyup="post('main.persist')"
+                wf-onblur="post('main.listModels')"
               />
             </div>
             <div wf-if="state.main.options.oaiKey || state.main.options.xaiKey">
@@ -798,7 +800,7 @@
               wf-onkeydown="rawctrls.main.actions.msgKeyDown(event)"
             ></textarea>
             <div
-              class="self-stretch flex border-l border-[#dfe2e5] relative items-center group"
+              class="self-stretch flex border-l border-[#dfe2e5] relative items-center group min-w-32"
               wf-if="state.main.models.length || state.main.tmp.loadingModels"
             >
               <div
